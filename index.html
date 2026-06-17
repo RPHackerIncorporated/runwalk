@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0a0e1a" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<title>Run / Walk</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#131a2e; --panel2:#1c2540;
+    --run:#22c55e; --walk:#3b82f6; --amber:#f59e0b;
+    --text:#e8edf7; --dim:#8a96b4; --line:#27314f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow-x:hidden;
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:16px 16px 40px;}
+  h1{font-size:15px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); font-weight:600; text-align:center; margin:8px 0 18px;}
+
+  /* ---- Setup ---- */
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px;}
+  .row{display:flex; gap:12px;}
+  .field{flex:1;}
+  label{display:block; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:7px;}
+  .stepper{display:flex; align-items:center; background:var(--panel2); border-radius:14px; overflow:hidden;}
+  .stepper button{flex:0 0 52px; height:60px; background:none; border:none; color:var(--text); font-size:30px; font-weight:300;}
+  .stepper button:active{background:#2a3760;}
+  .stepper .val{flex:1; text-align:center; font-size:26px; font-variant-numeric:tabular-nums; font-weight:600;}
+  .stepper .val small{display:block; font-size:11px; color:var(--dim); font-weight:400; letter-spacing:.05em; margin-top:2px;}
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .chip{background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:999px; padding:8px 13px; font-size:13px;}
+  .chip:active{background:#2a3760;}
+
+  /* landmarks editor */
+  .lm-edit{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+  .lm-edit input{background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px; font-size:15px; min-width:0;}
+  .lm-edit input.lbl{flex:1;}
+  .lm-edit input.tm{width:78px; text-align:center; font-variant-numeric:tabular-nums;}
+  .lm-edit .del{flex:0 0 38px; height:40px; background:none; border:none; color:var(--dim); font-size:22px;}
+  .addbtn{width:100%; background:var(--panel2); border:1px dashed var(--line); color:var(--dim); border-radius:12px; padding:12px; font-size:14px; margin-top:4px;}
+
+  .start{width:100%; height:72px; border:none; border-radius:18px; background:var(--run); color:#04200f; font-size:22px; font-weight:800; letter-spacing:.04em; margin-top:6px;}
+  .start:active{filter:brightness(.9);}
+
+  /* ---- Run screen ---- */
+  #run-screen{display:none; min-height:90vh; flex-direction:column;}
+  .phase-card{border-radius:24px; padding:26px 20px; text-align:center; transition:background .25s; position:relative;}
+  .phase-run{background:linear-gradient(160deg,#16351f,#0f2a18);}
+  .phase-walk{background:linear-gradient(160deg,#162a4a,#0f1f3a);}
+  .phase-ready{background:linear-gradient(160deg,#3a2e10,#241d0a);}
+  .phase-name{font-size:54px; font-weight:900; letter-spacing:.04em; line-height:1;}
+  .run .phase-name{color:var(--run);} .walk .phase-name{color:var(--walk);} .ready .phase-name{color:var(--amber);}
+  .phase-count{font-size:88px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; margin-top:10px;}
+  .phase-sub{color:var(--dim); font-size:14px; margin-top:10px; letter-spacing:.05em;}
+
+  .clock-card{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:18px; text-align:center; margin-top:14px;}
+  .clock{font-size:60px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.02em;}
+  .clock-lbl{font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.12em;}
+
+  .lm-list{margin-top:14px;}
+  .lm-item{display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:9px;}
+  .lm-item:active{background:var(--panel2);}
+  .lm-item.passed{opacity:.65;}
+  .lm-main{flex:1; min-width:0;}
+  .lm-name{font-size:16px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lm-target{font-size:12px; color:var(--dim); margin-top:2px;}
+  .lm-result{text-align:right; font-variant-numeric:tabular-nums; flex:0 0 auto;}
+  .lm-actual{font-size:17px; font-weight:700;}
+  .lm-delta{font-size:13px; font-weight:700;}
+  .ahead{color:var(--run);} .behind{color:#f87171;}
+  .tap-hint{font-size:12px; color:var(--dim);}
+
+  .controls{display:flex; gap:12px; margin-top:auto; padding-top:18px;}
+  .controls button{flex:1; height:64px; border:none; border-radius:16px; font-size:18px; font-weight:700;}
+  .btn-pause{background:var(--amber); color:#241a04;}
+  .btn-stop{background:var(--panel2); color:var(--text); border:1px solid var(--line) !important;}
+
+  .note{font-size:12px; color:var(--dim); text-align:center; margin-top:14px; line-height:1.5;}
+
+  /* voice cue recorder */
+  .cue-row{display:flex; align-items:center; gap:9px; background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px;}
+  .cue-id{flex:0 0 46px; font-weight:800; font-size:14px; letter-spacing:.04em;}
+  .cue-id.run{color:var(--run);} .cue-id.walk{color:var(--walk);}
+  .cue-status{flex:1; font-size:13px; color:var(--dim); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .cue-btn{flex:0 0 auto; background:#26315a; border:1px solid var(--line); color:var(--text); border-radius:9px; padding:9px 11px; font-size:13px;}
+  .cue-btn.rec.on{background:#7f1d1d; border-color:#dc2626; color:#fff;}
+  .cue-btn:active{filter:brightness(1.25);}
+  .cue-hint{font-size:12px; color:var(--dim); margin-top:6px; line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Run · Walk</h1>
+
+  <!-- ================= SETUP ================= -->
+  <div id="setup-screen">
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label>Run</label>
+          <div class="stepper">
+            <button data-step="run" data-d="-5">−</button>
+            <div class="val"><span id="runVal">30</span><small>seconds</small></div>
+            <button data-step="run" data-d="5">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Walk</label>
+          <div class="stepper">
+            <button data-step="walk" data-d="-15">−</button>
+            <div class="val"><span id="walkVal">120</span><small>seconds</small></div>
+            <button data-step="walk" data-d="15">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="presets" id="presets">
+        <button class="chip" data-run="30" data-walk="120">30s / 2m</button>
+        <button class="chip" data-run="60" data-walk="120">1m / 2m</button>
+        <button class="chip" data-run="60" data-walk="90">1m / 90s</button>
+        <button class="chip" data-run="120" data-walk="60">2m / 1m</button>
+        <button class="chip" data-run="60" data-walk="60">1m / 1m</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Landmarks &amp; target times</label>
+      <div id="lmEditor"></div>
+      <button class="addbtn" id="addLm">+ Add landmark</button>
+    </div>
+
+    <div class="card">
+      <label>Voice cues</label>
+      <div class="cue-row" data-cue="run">
+        <div class="cue-id run">RUN</div>
+        <div class="cue-status"></div>
+        <button class="cue-btn play" title="Preview">▶</button>
+        <button class="cue-btn rec">● Rec</button>
+        <button class="cue-btn reset" title="Reset to default">↺</button>
+      </div>
+      <div class="cue-row" data-cue="walk">
+        <div class="cue-id walk">WALK</div>
+        <div class="cue-status"></div>
+        <button class="cue-btn play" title="Preview">▶</button>
+        <button class="cue-btn rec">● Rec</button>
+        <button class="cue-btn reset" title="Reset to default">↺</button>
+      </div>
+      <div class="cue-hint">Default is a tone. Tap <b>● Rec</b>, say "Run!" / "Walk!", tap <b>■ Stop</b> — that recording then plays at each switch, even with the screen locked.</div>
+    </div>
+
+    <button class="start" id="startBtn">START</button>
+    <div class="note">Plays voice cues over Spotify · keeps screen awake while running.<br>Add to Home Screen for a full-screen app.</div>
+  </div>
+
+  <!-- ================= RUN ================= -->
+  <div id="run-screen">
+    <div class="phase-card phase-ready" id="phaseCard">
+      <div class="phase-name" id="phaseName">GET READY</div>
+      <div class="phase-count" id="phaseCount">5</div>
+      <div class="phase-sub" id="phaseSub">until start</div>
+    </div>
+
+    <div class="clock-card">
+      <div class="clock" id="totalClock">0:00</div>
+      <div class="clock-lbl">Total time · interval <span id="intervalNum">–</span></div>
+    </div>
+
+    <div class="lm-list" id="lmList"></div>
+
+    <div class="controls">
+      <button class="btn-pause" id="pauseBtn">Pause</button>
+      <button class="btn-stop" id="stopBtn">Finish</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- service worker (offline) ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+
+/* ---------- persistence ---------- */
+const DEF = {
+  run:30, walk:120,
+  landmarks:[
+    {label:"Top of 5-min path", t:13*60},
+    {label:"Top of Mt Vic", t:27*60},
+  ]
+};
+function load(){ try{ return Object.assign({}, DEF, JSON.parse(localStorage.getItem("runwalk")||"{}")); }catch(e){ return {...DEF}; } }
+function save(){ localStorage.setItem("runwalk", JSON.stringify({run:cfg.run, walk:cfg.walk, landmarks:cfg.landmarks})); }
+let cfg = load();
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+function fmt(sec){ sec=Math.max(0,Math.round(sec)); const m=Math.floor(sec/60), s=sec%60; return m+":"+String(s).padStart(2,"0"); }
+function parseTime(str){ // "13:00" or "13" -> seconds, null if blank/invalid
+  str=(str||"").trim(); if(!str) return null;
+  if(str.includes(":")){ const [m,s]=str.split(":"); const mm=parseInt(m,10), ss=parseInt(s||"0",10); if(isNaN(mm)) return null; return mm*60+(isNaN(ss)?0:ss); }
+  const v=parseInt(str,10); return isNaN(v)?null:v*60;
+}
+
+/* ---------- setup UI ---------- */
+function renderSteppers(){ $("runVal").textContent=cfg.run; $("walkVal").textContent=cfg.walk; }
+document.querySelectorAll(".stepper button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const k=b.dataset.step, d=parseInt(b.dataset.d,10);
+    cfg[k]=Math.max(5, cfg[k]+d); renderSteppers(); save();
+  });
+});
+$("presets").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c)return;
+  cfg.run=+c.dataset.run; cfg.walk=+c.dataset.walk; renderSteppers(); save();
+});
+
+function renderLmEditor(){
+  const box=$("lmEditor"); box.innerHTML="";
+  cfg.landmarks.forEach((lm,i)=>{
+    const row=document.createElement("div"); row.className="lm-edit";
+    row.innerHTML=`<input class="lbl" placeholder="Landmark name" value="${(lm.label||"").replace(/"/g,'&quot;')}">
+      <input class="tm" placeholder="mm:ss" value="${lm.t!=null?fmt(lm.t):""}">
+      <button class="del">×</button>`;
+    const [lbl,tm]=row.querySelectorAll("input");
+    lbl.addEventListener("input",()=>{ cfg.landmarks[i].label=lbl.value; save(); });
+    tm.addEventListener("change",()=>{ cfg.landmarks[i].t=parseTime(tm.value); save(); });
+    row.querySelector(".del").addEventListener("click",()=>{ cfg.landmarks.splice(i,1); renderLmEditor(); save(); });
+    box.appendChild(row);
+  });
+}
+$("addLm").addEventListener("click",()=>{ cfg.landmarks.push({label:"",t:null}); renderLmEditor(); save(); });
+
+renderSteppers(); renderLmEditor();
+
+/* ---------- voice cue recording ---------- */
+const cueData={run:null, walk:null};
+let mediaRec=null, recChunks=[], recWhich=null, recCap=null;
+function loadCues(){ ["run","walk"].forEach(w=>{ cueData[w]=localStorage.getItem("runwalk_cue_"+w)||null; }); }
+function renderCues(){
+  document.querySelectorAll(".cue-row").forEach(row=>{
+    const w=row.dataset.cue;
+    const status=row.querySelector(".cue-status"), rec=row.querySelector(".rec"), reset=row.querySelector(".reset");
+    if(recWhich===w){ status.textContent="Recording… tap to stop"; rec.textContent="■ Stop"; rec.classList.add("on"); }
+    else { status.textContent=cueData[w]?"Custom recording ✓":"Built-in tone"; rec.textContent="● Rec"; rec.classList.remove("on"); }
+    reset.style.visibility=cueData[w]?"visible":"hidden";
+  });
+}
+async function toggleRecord(w){
+  if(recWhich){ if(mediaRec && mediaRec.state!=="inactive") mediaRec.stop(); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    alert("Recording needs the app served over https (or localhost)."); return;
+  }
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ alert("Microphone access needed. Allow the mic and try again — the page must be served over https."); return; }
+  recChunks=[]; recWhich=w;
+  try{ mediaRec=new MediaRecorder(stream); }catch(e){ try{ mediaRec=new MediaRecorder(stream,{mimeType:"audio/webm"}); }catch(e2){ alert("Recording not supported on this browser."); recWhich=null; return; } }
+  mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) recChunks.push(e.data); };
+  mediaRec.onstop=()=>{
+    clearTimeout(recCap);
+    stream.getTracks().forEach(t=>t.stop());
+    const blob=new Blob(recChunks,{type:(mediaRec&&mediaRec.mimeType)||"audio/webm"});
+    const fr=new FileReader();
+    fr.onload=()=>{
+      cueData[w]=fr.result;
+      try{ localStorage.setItem("runwalk_cue_"+w, fr.result); }catch(err){ alert("Recording is too long to save — keep it under ~2 seconds."); cueData[w]=null; }
+      recWhich=null; mediaRec=null; renderCues();
+    };
+    fr.readAsDataURL(blob);
+  };
+  mediaRec.start();
+  recCap=setTimeout(()=>{ if(mediaRec && mediaRec.state!=="inactive") mediaRec.stop(); }, 6000);
+  renderCues();
+}
+function previewCue(w){
+  initAudio();
+  if(cueData[w]){ const a=new Audio(cueData[w]); a.volume=1; a.play().catch(()=>{}); }
+  else if(audioCtx){ const t=audioCtx.currentTime+0.04; w==="run"?runPatternAt(t):walkPatternAt(t); }
+}
+function resetCue(w){ cueData[w]=null; localStorage.removeItem("runwalk_cue_"+w); renderCues(); }
+async function decodeCues(){
+  cueBuf.run=null; cueBuf.walk=null;
+  if(!audioCtx) return;
+  for(const w of ["run","walk"]){
+    if(!cueData[w]) continue;
+    try{ const ab=await (await fetch(cueData[w])).arrayBuffer(); cueBuf[w]=await audioCtx.decodeAudioData(ab); }
+    catch(e){ cueBuf[w]=null; }
+  }
+}
+document.querySelectorAll(".cue-row").forEach(row=>{
+  const w=row.dataset.cue;
+  row.querySelector(".rec").addEventListener("click",()=>toggleRecord(w));
+  row.querySelector(".play").addEventListener("click",()=>previewCue(w));
+  row.querySelector(".reset").addEventListener("click",()=>resetCue(w));
+});
+loadCues(); renderCues();
+
+/* ---------- audio / cues ----------
+   Two layers so cues fire even with the screen LOCKED:
+   1) a silent looping track + low-gain buffer keep the tab/AudioContext alive
+   2) cue tones are pre-scheduled on the AudioContext clock, so they sound at
+      the exact boundary even if JS timers are throttled in the background.    */
+let audioCtx=null;
+function initAudio(){
+  if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(audioCtx && audioCtx.state==="suspended") audioCtx.resume();
+}
+
+/* immediate one-off beep (countdown ticks, landmark taps) */
+function beep(freq=880, dur=0.16, type="sine"){
+  if(!audioCtx) return;
+  toneAt(audioCtx.currentTime, freq, dur, type, 0.6);
+}
+/* schedule a single tone at an absolute AudioContext time */
+function toneAt(t, freq, dur, type, vol){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.type=type||"sine"; o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol||0.6, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(t); o.stop(t+dur+0.05);
+  scheduledNodes.push(o);
+}
+/* distinct earcons: RUN = rising 3 tones, WALK = falling 2 tones */
+function runPatternAt(t){ toneAt(t,784,0.16,"sine",0.6); toneAt(t+0.18,988,0.16,"sine",0.6); toneAt(t+0.36,1175,0.24,"sine",0.6); }
+function walkPatternAt(t){ toneAt(t,587,0.22,"triangle",0.55); toneAt(t+0.26,440,0.32,"triangle",0.55); }
+
+/* recorded-voice cues (decoded buffers); fall back to the tone earcons */
+let cueBuf={run:null, walk:null};
+function bufferAt(t, buf, vol){
+  if(!audioCtx || !buf) return;
+  const s=audioCtx.createBufferSource(); s.buffer=buf;
+  const g=audioCtx.createGain(); g.gain.value=(vol==null?1:vol);
+  s.connect(g); g.connect(audioCtx.destination);
+  try{ s.start(t); }catch(e){}
+  scheduledNodes.push(s);
+}
+function playRunCueAt(t){ cueBuf.run ? bufferAt(t,cueBuf.run,1) : runPatternAt(t); }
+function playWalkCueAt(t){ cueBuf.walk ? bufferAt(t,cueBuf.walk,1) : walkPatternAt(t); }
+
+function speak(text){
+  if(!text) return;
+  try{
+    const u=new SpeechSynthesisUtterance(text);
+    u.rate=1.0; u.volume=1.0; u.pitch=1.0;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){}
+}
+function vibrate(p){ if(navigator.vibrate) navigator.vibrate(p); }
+
+/* ----- look-ahead cue scheduler ----- */
+const CUE_WINDOW=120;            // schedule cues this many seconds ahead
+let scheduledKeys=new Set();
+let scheduledNodes=[];
+function clearScheduled(){
+  scheduledNodes.forEach(n=>{ try{n.stop();}catch(e){} try{n.disconnect();}catch(e){} });
+  scheduledNodes=[]; scheduledKeys.clear();
+}
+function boundaries(eNow){
+  const cyc=cfg.run+cfg.walk, out=[];
+  if(LEAD>eNow && LEAD<=eNow+CUE_WINDOW) out.push({key:"go", e:LEAD, type:"run"});
+  const base=Math.max(0, Math.floor((eNow-LEAD)/cyc)-1);
+  for(let n=base; n<=base+Math.ceil(CUE_WINDOW/cyc)+2; n++){
+    const wt=LEAD+n*cyc+cfg.run, rt=LEAD+(n+1)*cyc;
+    if(wt>eNow && wt<=eNow+CUE_WINDOW) out.push({key:"w"+n, e:wt, type:"walk"});
+    if(rt>eNow && rt<=eNow+CUE_WINDOW) out.push({key:"r"+(n+1), e:rt, type:"run"});
+  }
+  return out;
+}
+function scheduleCues(){
+  if(!audioCtx) return;
+  const eNow=elapsedSec();
+  boundaries(eNow).forEach(b=>{
+    if(scheduledKeys.has(b.key)) return;
+    scheduledKeys.add(b.key);
+    const at=audioCtx.currentTime+(b.e-eNow);
+    if(at < audioCtx.currentTime-0.05) return;
+    if(b.type==="run") playRunCueAt(at); else playWalkCueAt(at);
+  });
+}
+
+/* ----- keep-alive: silent media so the tab survives a screen lock ----- */
+let keepEl=null, keepBuf=null, silentUrl=null;
+function silentWavUrl(){
+  if(silentUrl) return silentUrl;
+  const sr=8000, n=sr; const ab=new ArrayBuffer(44+n*2); const v=new DataView(ab);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n*2,true);
+  silentUrl=URL.createObjectURL(new Blob([ab],{type:"audio/wav"})); return silentUrl;
+}
+function startKeepAlive(){
+  try{
+    if(!keepEl){ keepEl=new Audio(silentWavUrl()); keepEl.loop=true; keepEl.volume=1; }
+    keepEl.play().catch(()=>{});
+  }catch(e){}
+  try{
+    if("mediaSession" in navigator){
+      navigator.mediaSession.metadata=new MediaMetadata({title:"Run / Walk", artist:"Interval timer"});
+      ["pause","stop"].forEach(a=>{ try{ navigator.mediaSession.setActionHandler(a,()=>{}); }catch(e){} });
+    }
+  }catch(e){}
+  if(audioCtx && !keepBuf){
+    try{
+      const b=audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+      const s=audioCtx.createBufferSource(); s.buffer=b; s.loop=true;
+      const g=audioCtx.createGain(); g.gain.value=0.0002;
+      s.connect(g); g.connect(audioCtx.destination); s.start(); keepBuf=s;
+    }catch(e){}
+  }
+}
+function stopKeepAlive(){
+  try{ keepEl&&keepEl.pause(); }catch(e){}
+  try{ keepBuf&&keepBuf.stop(); }catch(e){} keepBuf=null;
+}
+
+/* ---------- wake lock ---------- */
+let wakeLock=null;
+async function requestWake(){ try{ if("wakeLock" in navigator) wakeLock=await navigator.wakeLock.request("screen"); }catch(e){} }
+function releaseWake(){ try{ wakeLock&&wakeLock.release(); wakeLock=null; }catch(e){} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&running&&!paused) requestWake(); });
+
+/* ---------- timer engine ---------- */
+const LEAD=5; // get-ready seconds
+let running=false, paused=false;
+let startEpoch=0;      // when run began (after accounting for pauses)
+let accumPaused=0;     // ms of pause already absorbed
+let pauseStart=0;
+let lastPhase="ready";
+let tickId=null;
+let lmState=[];        // {marked:bool, actual:sec}
+
+function elapsedSec(){ return (Date.now()-startEpoch-accumPaused)/1000; }
+
+async function startRun(){
+  running=true; paused=false; accumPaused=0; startEpoch=Date.now();
+  lastPhase="ready";
+  lmState=cfg.landmarks.map(()=>({marked:false, actual:null}));
+  initAudio();
+  clearScheduled();
+  startKeepAlive();
+  await decodeCues();
+  startEpoch=Date.now();   // reset clock after any decode delay
+  scheduleCues();
+  requestWake();
+  // warm up speech engine (some phones need a primer gesture)
+  try{ speechSynthesis.speak(new SpeechSynthesisUtterance("")); }catch(e){}
+  $("setup-screen").style.display="none";
+  $("run-screen").style.display="flex";
+  renderLmRun();
+  tickId=setInterval(tick,150);
+  tick();
+}
+
+function currentState(){
+  const e=elapsedSec();
+  if(e<LEAD){
+    return {phase:"ready", count:Math.ceil(LEAD-e), interval:0};
+  }
+  const t=e-LEAD;
+  const cyc=cfg.run+cfg.walk;
+  const pos=t%cyc;
+  const interval=Math.floor(t/cyc)+1;
+  if(pos<cfg.run) return {phase:"run", count:Math.ceil(cfg.run-pos), interval};
+  return {phase:"walk", count:Math.ceil(cyc-pos), interval};
+}
+
+function tick(){
+  if(!running||paused) return;
+  const st=currentState();
+  const e=elapsedSec();
+
+  // make sure upcoming audible cues are queued on the audio clock (fires when locked)
+  scheduleCues();
+
+  // phase transitions — voice + haptics (best-effort; the tones are pre-scheduled)
+  if(st.phase!==lastPhase){
+    if(st.phase==="run"){ if(!cueBuf.run) speak(lastPhase==="ready"?"Run!":"Time to run"); vibrate([0,120,80,120]); }
+    else if(st.phase==="walk"){ if(!cueBuf.walk) speak("Time to walk"); vibrate([0,300]); }
+    lastPhase=st.phase;
+  } else if(st.phase==="ready"){
+    // countdown ticks for last 3 sec of "get ready"
+    if(st.count<=3 && st.count>=1 && Math.abs((LEAD-e)-st.count)<0.12) beep(660,0.08);
+  }
+
+  // phase card
+  const card=$("phaseCard"), nm=$("phaseName"), ct=$("phaseCount"), sub=$("phaseSub");
+  card.className="phase-card "+(st.phase==="run"?"phase-run run":st.phase==="walk"?"phase-walk walk":"phase-ready ready");
+  nm.textContent = st.phase==="run"?"RUN":st.phase==="walk"?"WALK":"GET READY";
+  ct.textContent = st.count;
+  sub.textContent = st.phase==="ready"?"until start":(st.phase==="run"?"sec — then walk":"sec — then run");
+
+  // clocks
+  $("totalClock").textContent=fmt(Math.max(0,e));
+  $("intervalNum").textContent = st.interval>0?st.interval:"–";
+
+  // auto-flag passed landmarks (visual only)
+  updateLmPassed(Math.max(0,e));
+}
+
+/* ---------- landmarks on run screen ---------- */
+function renderLmRun(){
+  const box=$("lmList"); box.innerHTML="";
+  cfg.landmarks.forEach((lm,i)=>{
+    if(!lm.label && lm.t==null) return;
+    const el=document.createElement("div"); el.className="lm-item"; el.dataset.i=i;
+    el.innerHTML=`<div class="lm-main">
+        <div class="lm-name">${(lm.label||"Landmark").replace(/</g,"&lt;")}</div>
+        <div class="lm-target">target ${lm.t!=null?fmt(lm.t):"—"} · <span class="tap-hint">tap when you reach it</span></div>
+      </div>
+      <div class="lm-result"></div>`;
+    el.addEventListener("click",()=>markLm(i));
+    box.appendChild(el);
+  });
+}
+function markLm(i){
+  if(!lmState[i]) return;
+  const e=Math.max(0,elapsedSec());
+  lmState[i]={marked:true, actual:e};
+  beep(740,0.12); vibrate(60);
+  paintLm(i);
+}
+function paintLm(i){
+  const el=$("lmList").querySelector(`[data-i="${i}"]`); if(!el) return;
+  const lm=cfg.landmarks[i], s=lmState[i];
+  const res=el.querySelector(".lm-result");
+  if(s && s.marked){
+    el.classList.add("passed");
+    let delta="";
+    if(lm.t!=null){
+      const d=s.actual-lm.t; const cls=d<=0?"ahead":"behind"; const sign=d<=0?"−":"+";
+      delta=`<div class="lm-delta ${cls}">${sign}${fmt(Math.abs(d))} vs target</div>`;
+    }
+    res.innerHTML=`<div class="lm-actual">${fmt(s.actual)}</div>${delta}`;
+    el.querySelector(".lm-target").innerHTML=`target ${lm.t!=null?fmt(lm.t):"—"}`;
+  }
+}
+function updateLmPassed(e){
+  cfg.landmarks.forEach((lm,i)=>{
+    if(lm.t!=null && !lmState[i]?.marked){
+      const el=$("lmList").querySelector(`[data-i="${i}"]`);
+      if(el) el.style.opacity = e>=lm.t ? "1" : "1";
+    }
+  });
+}
+
+/* ---------- controls ---------- */
+$("startBtn").addEventListener("click",()=>{ initAudio(); startRun(); });
+
+$("pauseBtn").addEventListener("click",()=>{
+  if(!running) return;
+  if(!paused){
+    paused=true; pauseStart=Date.now(); $("pauseBtn").textContent="Resume";
+    releaseWake(); speechSynthesis.cancel(); clearScheduled(); stopKeepAlive();
+  } else {
+    accumPaused += Date.now()-pauseStart; paused=false; $("pauseBtn").textContent="Pause";
+    requestWake(); startKeepAlive(); scheduleCues();
+  }
+});
+
+$("stopBtn").addEventListener("click",()=>{
+  running=false; paused=false;
+  clearInterval(tickId); tickId=null;
+  releaseWake(); speechSynthesis.cancel(); clearScheduled(); stopKeepAlive();
+  $("pauseBtn").textContent="Pause";
+  $("run-screen").style.display="none";
+  $("setup-screen").style.display="block";
+});
+</script>
+</body>
+</html>
