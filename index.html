@@ -504,12 +504,13 @@ function tick(){
   ct.textContent = st.count;
   sub.textContent = st.phase==="ready"?"until start":(st.phase==="run"?"sec — then walk":"sec — then run");
 
-  // clocks
-  $("totalClock").textContent=fmt(Math.max(0,e));
+  // clocks — total time counts from "Go", not during the GET READY lead-in
+  const rt=Math.max(0, e-LEAD);
+  $("totalClock").textContent=fmt(rt);
   $("intervalNum").textContent = st.interval>0?st.interval:"–";
 
   // auto-flag passed landmarks (visual only)
-  updateLmPassed(Math.max(0,e));
+  updateLmPassed(rt);
 }
 
 /* ---------- landmarks on run screen ---------- */
@@ -529,8 +530,8 @@ function renderLmRun(){
 }
 function markLm(i){
   if(!lmState[i]) return;
-  const e=Math.max(0,elapsedSec());
-  lmState[i]={marked:true, actual:e};
+  const rt=Math.max(0, elapsedSec()-LEAD);   // measured from "Go", matching the clock
+  lmState[i]={marked:true, actual:rt};
   beep(740,0.12); vibrate(60);
   paintLm(i);
 }
