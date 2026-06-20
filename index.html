@@ -95,6 +95,23 @@
   .cue-btn.rec.on{background:#7f1d1d; border-color:#dc2626; color:#fff;}
   .cue-btn:active{filter:brightness(1.25);}
   .cue-hint{font-size:12px; color:var(--dim); margin-top:6px; line-height:1.5;}
+
+  /* run history */
+  .histbtn{width:100%; background:none; border:none; color:var(--dim); font-size:14px; padding:14px; margin-top:2px;}
+  .histbtn:active{color:var(--text);}
+  #hist-screen{display:none;}
+  .hist-head{display:flex; align-items:center; gap:10px; margin:6px 0 16px;}
+  .hist-back,.hist-clear{background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:9px 13px; font-size:14px;}
+  .hist-clear{color:#f87171;}
+  .hist-title{flex:1; text-align:center; font-weight:700; font-size:16px;}
+  .hist-item{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px;}
+  .hist-dur{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .hist-date{font-size:13px; color:var(--dim); margin-top:1px;}
+  .hist-meta{font-size:13px; color:var(--dim); margin-top:6px;}
+  .hist-lm{font-size:13px; margin-top:6px; display:flex; justify-content:space-between; gap:10px;}
+  .hist-lm .nm{color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .hist-del{position:absolute; top:8px; right:10px; background:none; border:none; color:var(--dim); font-size:20px; line-height:1;}
+  .hist-empty{color:var(--dim); text-align:center; padding:40px 12px; font-size:14px; line-height:1.6;}
 </style>
 </head>
 <body>
@@ -158,6 +175,7 @@
 
     <button class="start" id="startBtn">START</button>
     <div class="note">Plays voice cues over Spotify · keeps screen awake while running.<br>Add to Home Screen for a full-screen app.</div>
+    <button class="histbtn" id="histBtn">📋 Run history</button>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -179,6 +197,16 @@
       <button class="btn-pause" id="pauseBtn">Pause</button>
       <button class="btn-stop" id="stopBtn">Finish</button>
     </div>
+  </div>
+
+  <!-- ================= HISTORY ================= -->
+  <div id="hist-screen">
+    <div class="hist-head">
+      <button class="hist-back" id="histBack">← Back</button>
+      <div class="hist-title">Run history</div>
+      <button class="hist-clear" id="histClear">Clear</button>
+    </div>
+    <div id="histList"></div>
   </div>
 </div>
 
@@ -304,6 +332,54 @@ document.querySelectorAll(".cue-row").forEach(row=>{
   row.querySelector(".reset").addEventListener("click",()=>resetCue(w));
 });
 loadCues(); renderCues();
+
+/* ---------- run history log ---------- */
+function loadLog(){ try{ return JSON.parse(localStorage.getItem("runwalk_log")||"[]"); }catch(e){ return []; } }
+function writeLog(log){ try{ localStorage.setItem("runwalk_log", JSON.stringify(log)); }catch(e){} }
+function logSession(){
+  const rt=Math.max(0, elapsedSec()-LEAD);
+  if(rt<10) return;                       // ignore accidental / very short runs
+  const cyc=cfg.run+cfg.walk;
+  const entry={
+    ts:Date.now(), dur:Math.round(rt), run:cfg.run, walk:cfg.walk,
+    intervals:Math.floor(rt/cyc)+1,
+    landmarks:cfg.landmarks.map((lm,i)=>({
+      label:lm.label||"", target:(lm.t!=null?lm.t:null),
+      actual:(lmState[i]&&lmState[i].marked?Math.round(lmState[i].actual):null)
+    })).filter(l=>l.label||l.target!=null||l.actual!=null)
+  };
+  const log=loadLog(); log.unshift(entry); if(log.length>200) log.length=200; writeLog(log);
+}
+function fmtDate(ts){ const d=new Date(ts);
+  return d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})+" · "+
+         d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }
+function renderHist(){
+  const log=loadLog(), box=$("histList"); box.innerHTML="";
+  if(!log.length){ box.innerHTML='<div class="hist-empty">No runs logged yet.<br>Finish a run and it shows up here.</div>'; return; }
+  log.forEach((e,idx)=>{
+    const lms=(e.landmarks||[]).map(l=>{
+      let right;
+      if(l.actual!=null){
+        right=fmt(l.actual);
+        if(l.target!=null){ const d=l.actual-l.target, cls=d<=0?"ahead":"behind"; right+=` <span class="${cls}">(${d<=0?"−":"+"}${fmt(Math.abs(d))})</span>`; }
+      } else { right=`<span style="color:var(--dim)">${l.target!=null?"target "+fmt(l.target):"—"}</span>`; }
+      return `<div class="hist-lm"><span class="nm">${(l.label||"Landmark").replace(/</g,"&lt;")}</span><span>${right}</span></div>`;
+    }).join("");
+    const div=document.createElement("div"); div.className="hist-item";
+    div.innerHTML=`<button class="hist-del" data-i="${idx}" aria-label="Delete">×</button>`+
+      `<div class="hist-dur">${fmt(e.dur)}</div>`+
+      `<div class="hist-date">${fmtDate(e.ts)}</div>`+
+      `<div class="hist-meta">run ${fmt(e.run)} / walk ${fmt(e.walk)} · ${e.intervals} interval${e.intervals===1?"":"s"}</div>`+
+      lms;
+    box.appendChild(div);
+  });
+  box.querySelectorAll(".hist-del").forEach(b=>b.addEventListener("click",()=>{
+    const log=loadLog(); log.splice(+b.dataset.i,1); writeLog(log); renderHist();
+  }));
+}
+$("histBtn").addEventListener("click",()=>{ renderHist(); $("setup-screen").style.display="none"; $("hist-screen").style.display="block"; });
+$("histBack").addEventListener("click",()=>{ $("hist-screen").style.display="none"; $("setup-screen").style.display="block"; });
+$("histClear").addEventListener("click",()=>{ if(confirm("Clear all run history?")){ localStorage.removeItem("runwalk_log"); renderHist(); } });
 
 /* ---------- audio / cues ----------
    Two layers so cues fire even with the screen LOCKED:
@@ -574,6 +650,7 @@ $("pauseBtn").addEventListener("click",()=>{
 });
 
 $("stopBtn").addEventListener("click",()=>{
+  if(running) logSession();
   running=false; paused=false;
   clearInterval(tickId); tickId=null;
   releaseWake(); speechSynthesis.cancel(); clearScheduled(); stopKeepAlive();
