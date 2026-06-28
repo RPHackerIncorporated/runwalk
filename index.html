@@ -369,7 +369,7 @@ function renderHist(){
     div.innerHTML=`<button class="hist-del" data-i="${idx}" aria-label="Delete">×</button>`+
       `<div class="hist-dur">${fmt(e.dur)}</div>`+
       `<div class="hist-date">${fmtDate(e.ts)}</div>`+
-      `<div class="hist-meta">run ${fmt(e.run)} / walk ${fmt(e.walk)} · ${e.intervals} interval${e.intervals===1?"":"s"}</div>`+
+      `<div class="hist-meta">run ${fmt(e.run)} / walk ${fmt(e.walk)} · ${e.intervals} interval${e.intervals===1?"":"s"}${e.recovered?' · <span style="color:var(--amber)">interrupted</span>':''}</div>`+
       lms;
     box.appendChild(div);
   });
@@ -380,6 +380,47 @@ function renderHist(){
 $("histBtn").addEventListener("click",()=>{ renderHist(); $("setup-screen").style.display="none"; $("hist-screen").style.display="block"; });
 $("histBack").addEventListener("click",()=>{ $("hist-screen").style.display="none"; $("setup-screen").style.display="block"; });
 $("histClear").addEventListener("click",()=>{ if(confirm("Clear all run history?")){ localStorage.removeItem("runwalk_log"); renderHist(); } });
+
+/* ---------- crash-safe active-run persistence ----------
+   Samsung (and other aggressive battery managers) can kill the tab mid-run.
+   We snapshot the live run to localStorage so it's never lost: on next open,
+   an unfinished run is recovered straight into the history log.            */
+let lastActiveSave=0;
+function saveActive(){
+  if(!running) return;
+  try{
+    localStorage.setItem("runwalk_active", JSON.stringify({
+      startEpoch, accumPaused, paused, lead:LEAD, run:cfg.run, walk:cfg.walk,
+      landmarks:cfg.landmarks.map((lm,i)=>({
+        label:lm.label||"", t:(lm.t!=null?lm.t:null),
+        actual:(lmState[i]&&lmState[i].marked?Math.round(lmState[i].actual):null)
+      })),
+      updated:Date.now()
+    }));
+  }catch(e){}
+}
+function clearActive(){ try{ localStorage.removeItem("runwalk_active"); }catch(e){} }
+function recoverActive(){
+  let a=null; try{ a=JSON.parse(localStorage.getItem("runwalk_active")||"null"); }catch(e){}
+  if(!a) return;
+  clearActive();
+  const lead=(a.lead!=null?a.lead:5);
+  const rt=Math.max(0, (a.updated - a.startEpoch - (a.accumPaused||0))/1000 - lead);
+  if(rt<10) return;                                   // too short to bother
+  const cyc=(a.run||0)+(a.walk||0);
+  const log=loadLog();
+  log.unshift({
+    ts:a.startEpoch+lead*1000, dur:Math.round(rt), run:a.run, walk:a.walk,
+    intervals: cyc>0?Math.floor(rt/cyc)+1:1,
+    landmarks:(a.landmarks||[]).map(l=>({label:l.label,target:l.t,actual:l.actual}))
+              .filter(l=>l.label||l.target!=null||l.actual!=null),
+    recovered:true
+  });
+  if(log.length>200) log.length=200; writeLog(log);
+}
+window.addEventListener("pagehide",()=>{ if(running) saveActive(); });
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden" && running) saveActive(); });
+recoverActive();
 
 /* ---------- audio / cues ----------
    Two layers so cues fire even with the screen LOCKED:
@@ -487,7 +528,8 @@ function startKeepAlive(){
   try{
     if("mediaSession" in navigator){
       navigator.mediaSession.metadata=new MediaMetadata({title:"Run / Walk", artist:"Interval timer"});
-      ["pause","stop"].forEach(a=>{ try{ navigator.mediaSession.setActionHandler(a,()=>{}); }catch(e){} });
+      ["play","pause","stop"].forEach(a=>{ try{ navigator.mediaSession.setActionHandler(a,()=>{}); }catch(e){} });
+      try{ navigator.mediaSession.playbackState="playing"; }catch(e){}
     }
   }catch(e){}
   if(audioCtx && !keepBuf){
@@ -502,6 +544,7 @@ function startKeepAlive(){
 function stopKeepAlive(){
   try{ keepEl&&keepEl.pause(); }catch(e){}
   try{ keepBuf&&keepBuf.stop(); }catch(e){} keepBuf=null;
+  try{ if("mediaSession" in navigator) navigator.mediaSession.playbackState="paused"; }catch(e){}
 }
 
 /* ---------- wake lock ---------- */
@@ -540,6 +583,7 @@ async function startRun(){
   renderLmRun();
   tickId=setInterval(tick,150);
   tick();
+  saveActive();
 }
 
 function currentState(){
@@ -587,6 +631,9 @@ function tick(){
 
   // auto-flag passed landmarks (visual only)
   updateLmPassed(rt);
+
+  // crash-safe snapshot every few seconds
+  if(Date.now()-lastActiveSave>3000){ lastActiveSave=Date.now(); saveActive(); }
 }
 
 /* ---------- landmarks on run screen ---------- */
@@ -647,10 +694,12 @@ $("pauseBtn").addEventListener("click",()=>{
     accumPaused += Date.now()-pauseStart; paused=false; $("pauseBtn").textContent="Pause";
     requestWake(); startKeepAlive(); scheduleCues();
   }
+  saveActive();
 });
 
 $("stopBtn").addEventListener("click",()=>{
   if(running) logSession();
+  clearActive();
   running=false; paused=false;
   clearInterval(tickId); tickId=null;
   releaseWake(); speechSynthesis.cancel(); clearScheduled(); stopKeepAlive();
