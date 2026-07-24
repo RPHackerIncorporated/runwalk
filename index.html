@@ -147,6 +147,10 @@
   .setrow input{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px; font-size:16px; text-align:center; font-variant-numeric:tabular-nums;}
   .backup{display:flex; gap:8px; margin-top:10px;}
   .backup button{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px; font-size:13px;}
+  #set-screen{display:none;}
+  .metrow{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--line); font-size:14px;}
+  .metrow:first-child{border-top:none;}
+  .metrow input{flex:0 0 92px; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px; font-size:16px; text-align:center; font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -212,26 +216,12 @@
     <button class="start" id="startBtn">START</button>
     <div class="note">Plays voice cues over Spotify · keeps screen awake while running.<br>Add to Home Screen for a full-screen app.</div>
     <div class="navrow">
-      <button id="dayBtn">📝 Today's log</button>
-      <button id="histBtn">📋 Run history</button>
+      <button id="dayBtn">📝 Today</button>
+      <button id="histBtn">📋 Runs</button>
+      <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="card" style="margin-top:12px;">
-      <label>Your details (for calorie estimates)</label>
-      <div class="setrow">
-        <div class="field"><label>Weight (kg)</label><input id="setWeight" type="number" inputmode="numeric" min="20" max="250"></div>
-        <div class="field"><label>Gym session (min)</label><input id="setGym" type="number" inputmode="numeric" min="5" max="180"></div>
-        <div class="field"><label>TKD session (min)</label><input id="setTkd" type="number" inputmode="numeric" min="5" max="240"></div>
-      </div>
-      <div class="backup">
-        <button id="exportBtn">⬇ Export backup</button>
-        <button id="importBtn">⬆ Restore</button>
-      </div>
-      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
-      <div class="auto">Your data lives on this phone only. Export now and then, and save it to Drive.</div>
-    </div>
-
-    <div class="note" style="margin-top:2px; opacity:.7;">version 1.7 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 1.8 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -294,7 +284,10 @@
       <div class="numrow"><input type="number" id="stepsIn" min="0" step="100" inputmode="numeric" placeholder="0"><span class="unit">steps</span></div>
       <div class="auto">Read it off Samsung Health and type it in — the browser can't get it automatically.</div>
     </div>
-    <div class="sec"><h3>Bonus</h3><input class="txt" id="bonusIn" placeholder="Anything extra"></div>
+    <div class="sec"><h3>Bonus</h3>
+      <input class="txt" id="bonusIn" placeholder="Anything extra">
+      <div class="numrow" style="margin-top:8px;"><input type="number" id="bonusMin" min="0" step="5" inputmode="numeric" placeholder="0"><span class="unit">minutes</span></div>
+    </div>
     <div class="sec"><h3>Notes</h3><textarea class="txt" id="notesIn" rows="3" placeholder="How did it feel?"></textarea></div>
 
     <div class="sec kcal">
@@ -304,6 +297,42 @@
     </div>
     <div class="saved" id="savedMsg"></div>
     <div class="navrow"><button id="dayBack">← Back</button></div>
+  </div>
+
+  <!-- ================= SETTINGS ================= -->
+  <div id="set-screen">
+    <div class="day-head">
+      <button class="day-nav" id="setBack">‹</button>
+      <div class="day-title">Settings</div>
+      <button class="day-nav" style="visibility:hidden">›</button>
+    </div>
+
+    <div class="sec"><h3>Your details</h3>
+      <div class="setrow">
+        <div class="field"><label>Weight (kg)</label><input id="setWeight" type="number" inputmode="decimal" min="20" max="250"></div>
+        <div class="field"><label>Gym session (min)</label><input id="setGym" type="number" inputmode="numeric" min="5" max="180"></div>
+        <div class="field"><label>TKD session (min)</label><input id="setTkd" type="number" inputmode="numeric" min="5" max="240"></div>
+      </div>
+      <div class="auto">Gym and TKD don't have a length in their names, so these are used for their calorie maths.</div>
+    </div>
+
+    <div class="sec"><h3>MET values</h3>
+      <div id="metList"></div>
+      <div class="auto">A MET is how many times harder than resting an activity is.<br>calories = MET × your weight × hours.</div>
+      <div class="backup"><button id="metReset">↺ Reset METs to defaults</button></div>
+    </div>
+
+    <div class="sec"><h3>Backup</h3>
+      <div class="backup">
+        <button id="exportBtn">⬇ Export backup</button>
+        <button id="importBtn">⬆ Restore</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+      <div class="auto">Your data lives on this phone only. Export now and then, and save the file to Drive.</div>
+    </div>
+
+    <div class="saved" id="setSaved"></div>
+    <div class="navrow"><button id="setBack2">← Back</button></div>
   </div>
 </div>
 
@@ -484,15 +513,23 @@ const ACT={
   yoga:   {box:"optYoga",    opts:["WAKE_UP_25","WAKE_UP_45","STRETCH_15","STRETCH_30","STRETCH_45"]},
   gym:    {box:"optGym",     opts:["TOPS","BOTTOMS","TKD_CORE"]}
 };
-const DEF_SET={weightKg:75, gymMin:45, tkdMin:60};
-let settings=Object.assign({}, DEF_SET, (function(){ try{ return JSON.parse(localStorage.getItem("runwalk_settings")||"{}"); }catch(e){ return {}; } })());
+const DEF_MET={pilates:3.0, yogaWake:3.0, yogaStretch:2.5, gym:4.0, walk:2.0, jog:8.0, cycle:6.8, tkd:10.0, bonus:4.0};
+const MET_FIELDS=[["pilates","Pilates"],["yogaWake","Yoga — wake up"],["yogaStretch","Yoga — stretch"],
+                  ["gym","Gym"],["walk","Walk / steps"],["jog","Jog"],["cycle","Cycle"],["tkd","TKD"],["bonus","Bonus"]];
+const DEF_SET={weightKg:75, gymMin:45, tkdMin:60, met:DEF_MET};
+let settings=(function(){
+  let s={}; try{ s=JSON.parse(localStorage.getItem("runwalk_settings")||"{}"); }catch(e){}
+  const merged=Object.assign({}, DEF_SET, s);
+  merged.met=Object.assign({}, DEF_MET, s.met||{});   // fill in any MET added in a later version
+  return merged;
+})();
 function saveSettings(){ try{ localStorage.setItem("runwalk_settings", JSON.stringify(settings)); }catch(e){} }
 
 function loadDays(){ try{ return JSON.parse(localStorage.getItem("runwalk_days")||"{}"); }catch(e){ return {}; } }
 function writeDays(d){ try{ localStorage.setItem("runwalk_days", JSON.stringify(d)); }catch(e){} }
 function dayKey(dt){ const d=dt||new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-function blankDay(){ return {pilates:[],yoga:[],gym:[],walkMin:0,jogMin:0,jogEdited:false,cycleMin:0,tkd:false,steps:0,bonus:"",notes:""}; }
+function blankDay(){ return {pilates:[],yoga:[],gym:[],walkMin:0,jogMin:0,jogEdited:false,cycleMin:0,tkd:false,steps:0,bonus:"",bonusMin:0,notes:""}; }
 /* Jog minutes for a day: the timer's total, unless you've typed your own figure.
    (Legacy records stored jogMin as "extra minutes" on top of the timer.)        */
 function jogMinutesFor(k, rec){
@@ -519,25 +556,28 @@ function timerJogMin(k){ return loadLog().filter(e=>dayKey(new Date(e.ts))===k).
    higher — never both, because your logged walk is already inside your steps.   */
 const STEPS_PER_MIN=100;               // typical walking cadence
 function dayEnergy(k, rec){
-  const w=settings.weightKg||75, kc=(met,min)=>met*w*((min||0)/60);
+  const w=settings.weightKg||75, M=settings.met, kc=(met,min)=>(met||0)*w*((min||0)/60);
   const parts=[];
   let v=0;
-  v=0; rec.pilates.forEach(o=>{ v+=kc(3.0, optMin(o,30)); }); if(v) parts.push({label:"Pilates", kcal:v});
-  v=0; rec.yoga.forEach(o=>{ v+=kc(o.indexOf("STRETCH")===0?2.5:3.0, optMin(o,30)); }); if(v) parts.push({label:"Yoga", kcal:v});
-  v=0; rec.gym.forEach(()=>{ v+=kc(4.0, settings.gymMin||45); }); if(v) parts.push({label:"Gym", kcal:v});
+  v=0; rec.pilates.forEach(o=>{ v+=kc(M.pilates, optMin(o,30)); }); if(v) parts.push({label:"Pilates", kcal:v});
+  v=0; rec.yoga.forEach(o=>{ v+=kc(o.indexOf("STRETCH")===0?M.yogaStretch:M.yogaWake, optMin(o,30)); }); if(v) parts.push({label:"Yoga", kcal:v});
+  v=0; rec.gym.forEach(()=>{ v+=kc(M.gym, settings.gymMin||45); }); if(v) parts.push({label:"Gym", kcal:v});
 
-  const byTime=kc(2.0, rec.walkMin);
-  const bySteps=kc(2.0, (rec.steps||0)/STEPS_PER_MIN);
+  const byTime=kc(M.walk, rec.walkMin);
+  const bySteps=kc(M.walk, (rec.steps||0)/STEPS_PER_MIN);
   if(byTime>0 || bySteps>0){
     const useSteps=bySteps>byTime;
     parts.push({label: useSteps ? `Walking (${rec.steps} steps)` : `Walking (${rec.walkMin} min)`,
                 kcal: Math.max(byTime,bySteps)});
   }
   const jm=jogMinutesFor(k, rec);
-  v=kc(8.0, jm); if(v) parts.push({label:`Jog (${Math.round(jm)} min)`, kcal:v});
-  v=kc(6.8, rec.cycleMin); if(v) parts.push({label:"Cycle", kcal:v});
-  v=rec.tkd?kc(10.0, settings.tkdMin||60):0; if(v) parts.push({label:"TKD", kcal:v});
-
+  v=kc(M.jog, jm); if(v) parts.push({label:`Jog (${Math.round(jm)} min)`, kcal:v});
+  v=kc(M.cycle, rec.cycleMin); if(v) parts.push({label:"Cycle", kcal:v});
+  v=rec.tkd?kc(M.tkd, settings.tkdMin||60):0; if(v) parts.push({label:"TKD", kcal:v});
+  v=kc(M.bonus, rec.bonusMin); if(v){
+    const t=(rec.bonus||"").trim();
+    parts.push({label:"Bonus"+(t?` (${t.length>18?t.slice(0,18)+"…":t})`:""), kcal:v});
+  }
   return {parts, total:Math.round(parts.reduce((s,p)=>s+p.kcal,0))};
 }
 function dayCalories(k, rec){ return dayEnergy(k, rec).total; }
@@ -565,7 +605,7 @@ function renderDay(){
   });
   $("walkMin").value=rec.walkMin||""; $("jogMin").value=jogMinutesFor(curDayKey, rec)||"";
   $("cycleMin").value=rec.cycleMin||""; $("stepsIn").value=rec.steps||"";
-  $("bonusIn").value=rec.bonus||""; $("notesIn").value=rec.notes||"";
+  $("bonusIn").value=rec.bonus||""; $("bonusMin").value=rec.bonusMin||""; $("notesIn").value=rec.notes||"";
   $("jogAuto").textContent=jogNote(curDayKey, rec);
   $("tkdYes").className=rec.tkd?"on":""; $("tkdNo").className=rec.tkd?"":"on";
   updateKcal(rec);
@@ -584,7 +624,7 @@ function bindNum(id, field){
     putDay(curDayKey,r); updateKcal(r); flashSaved();
   });
 }
-bindNum("walkMin","walkMin"); bindNum("cycleMin","cycleMin"); bindNum("stepsIn","steps");
+bindNum("walkMin","walkMin"); bindNum("cycleMin","cycleMin"); bindNum("stepsIn","steps"); bindNum("bonusMin","bonusMin");
 $("jogMin").addEventListener("input",()=>{
   const r=getDay(curDayKey);
   r.jogMin=Math.max(0, +$("jogMin").value||0); r.jogEdited=true;
@@ -601,10 +641,36 @@ $("dayBtn").addEventListener("click",()=>{ curDayKey=dayKey(); renderDay(); $("s
 $("dayBack").addEventListener("click",()=>{ $("day-screen").style.display="none"; $("setup-screen").style.display="block"; refreshTodo(); });
 
 /* settings + backup */
-function renderSettings(){ $("setWeight").value=settings.weightKg; $("setGym").value=settings.gymMin; $("setTkd").value=settings.tkdMin; }
-$("setWeight").addEventListener("input",()=>{ settings.weightKg=+$("setWeight").value||75; saveSettings(); });
-$("setGym").addEventListener("input",()=>{ settings.gymMin=+$("setGym").value||45; saveSettings(); });
-$("setTkd").addEventListener("input",()=>{ settings.tkdMin=+$("setTkd").value||60; saveSettings(); });
+let setSavedT=null;
+function flashSet(){ $("setSaved").textContent="saved ✓"; clearTimeout(setSavedT); setSavedT=setTimeout(()=>{ $("setSaved").textContent=""; },1200); }
+function renderMets(){
+  const box=$("metList"); box.innerHTML="";
+  MET_FIELDS.forEach(([k,label])=>{
+    const row=document.createElement("div"); row.className="metrow";
+    const span=document.createElement("span"); span.textContent=label;
+    const inp=document.createElement("input");
+    inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="25"; inp.inputMode="decimal";
+    inp.value=settings.met[k];
+    inp.addEventListener("input",()=>{ settings.met[k]=Math.max(0, +inp.value||0); saveSettings(); flashSet(); });
+    row.appendChild(span); row.appendChild(inp); box.appendChild(row);
+  });
+}
+function renderSettings(){
+  $("setWeight").value=settings.weightKg; $("setGym").value=settings.gymMin; $("setTkd").value=settings.tkdMin;
+  renderMets();
+}
+$("setWeight").addEventListener("input",()=>{ settings.weightKg=+$("setWeight").value||75; saveSettings(); flashSet(); });
+$("setGym").addEventListener("input",()=>{ settings.gymMin=+$("setGym").value||45; saveSettings(); flashSet(); });
+$("setTkd").addEventListener("input",()=>{ settings.tkdMin=+$("setTkd").value||60; saveSettings(); flashSet(); });
+$("metReset").addEventListener("click",()=>{
+  if(!confirm("Reset all MET values to their defaults?")) return;
+  settings.met=Object.assign({}, DEF_MET); saveSettings(); renderMets(); flashSet();
+});
+function showSettings(){ $("setup-screen").style.display="none"; $("set-screen").style.display="block"; renderSettings(); }
+function hideSettings(){ $("set-screen").style.display="none"; $("setup-screen").style.display="block"; }
+$("setBtn").addEventListener("click", showSettings);
+$("setBack").addEventListener("click", hideSettings);
+$("setBack2").addEventListener("click", hideSettings);
 renderSettings();
 $("exportBtn").addEventListener("click",()=>{
   const data={v:1, exported:new Date().toISOString(), settings, days:loadDays(), runs:loadLog(),
@@ -623,7 +689,11 @@ $("importFile").addEventListener("change",e=>{
       const d=JSON.parse(fr.result);
       if(d.days) writeDays(d.days);
       if(d.runs) writeLog(d.runs);
-      if(d.settings){ settings=Object.assign({},DEF_SET,d.settings); saveSettings(); renderSettings(); }
+      if(d.settings){
+        settings=Object.assign({}, DEF_SET, d.settings);
+        settings.met=Object.assign({}, DEF_MET, d.settings.met||{});
+        saveSettings(); renderSettings();
+      }
       if(d.cfg){ if(d.cfg.run) cfg.run=d.cfg.run; if(d.cfg.walk) cfg.walk=d.cfg.walk;
                  if(d.cfg.landmarks) cfg.landmarks=d.cfg.landmarks; save(); renderSteppers(); renderLmEditor(); }
       renderDay(); alert("Backup restored.");
