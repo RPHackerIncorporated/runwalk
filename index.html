@@ -231,7 +231,7 @@
       <div class="auto">Your data lives on this phone only. Export now and then, and save it to Drive.</div>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 1.5 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 1.6 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -511,10 +511,10 @@ function dayEnergy(k, rec){
   let v=0;
   v=0; rec.pilates.forEach(o=>{ v+=kc(3.0, optMin(o,30)); }); if(v) parts.push({label:"Pilates", kcal:v});
   v=0; rec.yoga.forEach(o=>{ v+=kc(o.indexOf("STRETCH")===0?2.5:3.0, optMin(o,30)); }); if(v) parts.push({label:"Yoga", kcal:v});
-  v=0; rec.gym.forEach(()=>{ v+=kc(5.0, settings.gymMin||45); }); if(v) parts.push({label:"Gym", kcal:v});
+  v=0; rec.gym.forEach(()=>{ v+=kc(4.0, settings.gymMin||45); }); if(v) parts.push({label:"Gym", kcal:v});
 
-  const byTime=kc(3.5, rec.walkMin);
-  const bySteps=kc(3.0, (rec.steps||0)/STEPS_PER_MIN);
+  const byTime=kc(2.0, rec.walkMin);
+  const bySteps=kc(2.0, (rec.steps||0)/STEPS_PER_MIN);
   if(byTime>0 || bySteps>0){
     const useSteps=bySteps>byTime;
     parts.push({label: useSteps ? `Walking (${rec.steps} steps)` : `Walking (${rec.walkMin} min)`,
