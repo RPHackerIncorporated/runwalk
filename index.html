@@ -222,7 +222,7 @@
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 2.0 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.1 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -651,7 +651,11 @@ function renderMets(){
   const box=$("metList"); box.innerHTML="";
   MET_FIELDS.forEach(([k,label])=>{
     const row=document.createElement("div"); row.className="metrow";
-    const span=document.createElement("span"); span.textContent=label;
+    const span=document.createElement("span"); span.textContent=label+" ";
+    const def=document.createElement("span");                 // show the default alongside
+    def.textContent="["+DEF_MET[k]+"]";
+    def.style.color="var(--dim)"; def.style.fontSize="12px";
+    span.appendChild(def);
     const inp=document.createElement("input");
     inp.type="number"; inp.step="0.1"; inp.min="0"; inp.max="25"; inp.inputMode="decimal";
     inp.value=settings.met[k];
