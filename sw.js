@@ -1,6 +1,6 @@
 ﻿// Offline cache. Network-first so updates show immediately when online,
 // falling back to cache when there's no signal mid-run.
-const CACHE = "runwalk-v6";
+const CACHE = "runwalk-v7";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", e => {

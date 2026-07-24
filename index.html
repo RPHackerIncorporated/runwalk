@@ -231,7 +231,7 @@
       <div class="auto">Your data lives on this phone only. Export now and then, and save it to Drive.</div>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 1.6 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 1.7 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -281,7 +281,7 @@
       <div class="numrow"><input type="number" id="walkMin" min="0" step="5" inputmode="numeric" placeholder="0"><span class="unit">minutes</span></div>
     </div>
     <div class="sec"><h3>Jog</h3>
-      <div class="numrow"><input type="number" id="jogMin" min="0" step="5" inputmode="numeric" placeholder="0"><span class="unit">extra minutes</span></div>
+      <div class="numrow"><input type="number" id="jogMin" min="0" step="5" inputmode="numeric" placeholder="0"><span class="unit">minutes</span></div>
       <div class="auto" id="jogAuto"></div>
     </div>
     <div class="sec"><h3>Cycle</h3>
@@ -492,7 +492,20 @@ function loadDays(){ try{ return JSON.parse(localStorage.getItem("runwalk_days")
 function writeDays(d){ try{ localStorage.setItem("runwalk_days", JSON.stringify(d)); }catch(e){} }
 function dayKey(dt){ const d=dt||new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
-function blankDay(){ return {pilates:[],yoga:[],gym:[],walkMin:0,jogMin:0,cycleMin:0,tkd:false,steps:0,bonus:"",notes:""}; }
+function blankDay(){ return {pilates:[],yoga:[],gym:[],walkMin:0,jogMin:0,jogEdited:false,cycleMin:0,tkd:false,steps:0,bonus:"",notes:""}; }
+/* Jog minutes for a day: the timer's total, unless you've typed your own figure.
+   (Legacy records stored jogMin as "extra minutes" on top of the timer.)        */
+function jogMinutesFor(k, rec){
+  const t=Math.round(timerJogMin(k));
+  if(rec.jogEdited) return rec.jogMin||0;
+  if(rec.jogMin>0)  return (rec.jogMin||0)+t;
+  return t;
+}
+function jogNote(k, rec){
+  const t=Math.round(timerJogMin(k));
+  if(!t) return "No timer sessions this day.";
+  return rec.jogEdited ? `Run/walk timer logged ${t} min.` : "Auto-filled from your run/walk timer.";
+}
 function getDay(k){ return Object.assign(blankDay(), loadDays()[k]||{}); }
 function putDay(k,rec){ const days=loadDays(); days[k]=rec; writeDays(days); }
 function dayIsEmpty(r){ return !r.pilates.length&&!r.yoga.length&&!r.gym.length&&!r.walkMin&&!r.jogMin&&
@@ -520,7 +533,7 @@ function dayEnergy(k, rec){
     parts.push({label: useSteps ? `Walking (${rec.steps} steps)` : `Walking (${rec.walkMin} min)`,
                 kcal: Math.max(byTime,bySteps)});
   }
-  const jm=(rec.jogMin||0)+timerJogMin(k);
+  const jm=jogMinutesFor(k, rec);
   v=kc(8.0, jm); if(v) parts.push({label:`Jog (${Math.round(jm)} min)`, kcal:v});
   v=kc(6.8, rec.cycleMin); if(v) parts.push({label:"Cycle", kcal:v});
   v=rec.tkd?kc(10.0, settings.tkdMin||60):0; if(v) parts.push({label:"TKD", kcal:v});
@@ -550,11 +563,10 @@ function renderDay(){
       box.appendChild(b);
     });
   });
-  $("walkMin").value=rec.walkMin||""; $("jogMin").value=rec.jogMin||"";
+  $("walkMin").value=rec.walkMin||""; $("jogMin").value=jogMinutesFor(curDayKey, rec)||"";
   $("cycleMin").value=rec.cycleMin||""; $("stepsIn").value=rec.steps||"";
   $("bonusIn").value=rec.bonus||""; $("notesIn").value=rec.notes||"";
-  const tj=timerJogMin(curDayKey);
-  $("jogAuto").textContent = tj>0 ? `+ ${Math.round(tj)} min already logged by the run/walk timer` : "No timer sessions this day.";
+  $("jogAuto").textContent=jogNote(curDayKey, rec);
   $("tkdYes").className=rec.tkd?"on":""; $("tkdNo").className=rec.tkd?"":"on";
   updateKcal(rec);
 }
@@ -572,7 +584,12 @@ function bindNum(id, field){
     putDay(curDayKey,r); updateKcal(r); flashSaved();
   });
 }
-bindNum("walkMin","walkMin"); bindNum("jogMin","jogMin"); bindNum("cycleMin","cycleMin"); bindNum("stepsIn","steps");
+bindNum("walkMin","walkMin"); bindNum("cycleMin","cycleMin"); bindNum("stepsIn","steps");
+$("jogMin").addEventListener("input",()=>{
+  const r=getDay(curDayKey);
+  r.jogMin=Math.max(0, +$("jogMin").value||0); r.jogEdited=true;
+  putDay(curDayKey,r); updateKcal(r); $("jogAuto").textContent=jogNote(curDayKey,r); flashSaved();
+});
 [["bonusIn","bonus"],["notesIn","notes"]].forEach(([id,f])=>{
   $(id).addEventListener("input",()=>{ const r=getDay(curDayKey); r[f]=$(id).value; putDay(curDayKey,r); flashSaved(); });
 });
