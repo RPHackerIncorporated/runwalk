@@ -206,11 +206,10 @@
         </div>
       </div>
       <div class="presets" id="presets">
-        <button class="chip" data-run="30" data-walk="120">30s / 2m</button>
-        <button class="chip" data-run="60" data-walk="120">1m / 2m</button>
-        <button class="chip" data-run="60" data-walk="90">1m / 90s</button>
-        <button class="chip" data-run="120" data-walk="60">2m / 1m</button>
-        <button class="chip" data-run="60" data-walk="60">1m / 1m</button>
+        <button class="chip" data-run="60" data-walk="30">1m / 30s</button>
+        <button class="chip" data-run="90" data-walk="30">90s / 30s</button>
+        <button class="chip" data-run="120" data-walk="30">2m / 30s</button>
+        <button class="chip" data-run="300" data-walk="30">5m / 30s</button>
       </div>
     </div>
 
@@ -229,7 +228,7 @@
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 2.4 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.5 · 25 Jul</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -392,7 +391,7 @@ if("serviceWorker" in navigator){
 
 /* ---------- persistence ---------- */
 const DEF = {
-  run:30, walk:120,
+  run:60, walk:30,
   landmarks:[
     {label:"Mt Victoria Loop", t:47*60},   // 47:00
     {label:"Park Run",         t:57*60},   // 57:00
@@ -683,16 +682,17 @@ function dayActivity(k, rec){
 function dayAreaCounts(k, rec){
   const gym=rec.gym||[], yoga=rec.yoga||[], pil=(rec.pilates||[]).length;
   const yogaWake=yoga.filter(o=>o.indexOf("WAKE")===0).length;
-  const jog=jogMinutesFor(k,rec)>0?1:0, cyc=(rec.cycleMin||0)>0?1:0, tkd=rec.tkd?1:0;
+  const jog=jogMinutesFor(k,rec)>0?1:0, cyc=(rec.cycleMin||0)>0?1:0;
   /* only a deliberate logged walk counts as a session — incidental steps don't,
      otherwise a normal 8k-step day would max out Lower body every day. */
   const bigWalk=(rec.walkMin||0)>=30?1:0;
+  /* TKD feeds calories only — it's tracked by its own weekly target, not the areas. */
   return {
     upper: gym.filter(o=>o==="TOPS").length,
-    lower: gym.filter(o=>o==="BOTTOMS").length + jog + cyc + tkd + bigWalk,
-    core : gym.filter(o=>o==="TKD_CORE").length + pil + yogaWake + tkd,
+    lower: gym.filter(o=>o==="BOTTOMS").length + jog + cyc + bigWalk,
+    core : gym.filter(o=>o==="TKD_CORE").length + pil + yogaWake,
     flex : pil + yoga.length,
-    cardio: jog + cyc + tkd                       // walking deliberately excluded
+    cardio: jog + cyc                             // walking + TKD deliberately excluded
   };
 }
 function mondayOf(d){ const x=new Date(d); x.setHours(12,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; }
