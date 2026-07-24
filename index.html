@@ -133,6 +133,10 @@
   .kcal{text-align:center;}
   .kcal .n{font-size:36px; font-weight:800; color:var(--amber); font-variant-numeric:tabular-nums; line-height:1.1;}
   .kcal .l{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.1em; margin-top:2px;}
+  .kcalbd{margin-top:12px; text-align:left;}
+  .kcalbd div{display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--dim); padding:4px 0; border-top:1px solid var(--line);}
+  .kcalbd div span:last-child{color:var(--text); font-variant-numeric:tabular-nums;}
+  .kcalbd .hint{display:block; border:none; color:var(--dim); font-size:11px; line-height:1.5; padding-top:8px;}
   .auto{font-size:12px; color:var(--dim); margin-top:8px; line-height:1.5;}
   .navrow{display:flex; gap:8px; margin-top:12px;}
   .navrow button{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:12px; padding:14px 8px; font-size:14px;}
@@ -227,7 +231,7 @@
       <div class="auto">Your data lives on this phone only. Export now and then, and save it to Drive.</div>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 1.4 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 1.5 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -293,7 +297,11 @@
     <div class="sec"><h3>Bonus</h3><input class="txt" id="bonusIn" placeholder="Anything extra"></div>
     <div class="sec"><h3>Notes</h3><textarea class="txt" id="notesIn" rows="3" placeholder="How did it feel?"></textarea></div>
 
-    <div class="sec kcal"><div class="n" id="kcalOut">0</div><div class="l">est. calories burnt</div></div>
+    <div class="sec kcal">
+      <div class="n" id="kcalOut">0</div>
+      <div class="l">est. calories burnt</div>
+      <div class="kcalbd" id="kcalBd"></div>
+    </div>
     <div class="saved" id="savedMsg"></div>
     <div class="navrow"><button id="dayBack">← Back</button></div>
   </div>
@@ -493,19 +501,33 @@ function dayIsEmpty(r){ return !r.pilates.length&&!r.yoga.length&&!r.gym.length&
 let curDayKey=dayKey();
 function optMin(o, fb){ const m=/_(\d+)$/.exec(o); return m?+m[1]:fb; }
 function timerJogMin(k){ return loadLog().filter(e=>dayKey(new Date(e.ts))===k).reduce((s,e)=>s+(e.dur||0)/60, 0); }
-/* MET-based estimate: kcal = MET x kg x hours. Rough, but consistent run to run. */
-function dayCalories(k, rec){
-  const w=settings.weightKg||75, add=(met,min)=>met*w*((min||0)/60);
-  let kcal=0;
-  rec.pilates.forEach(o=>{ kcal+=add(3.0, optMin(o,30)); });
-  rec.yoga.forEach(o=>{ kcal+=add(o.indexOf("STRETCH")===0?2.5:3.0, optMin(o,30)); });
-  rec.gym.forEach(()=>{ kcal+=add(5.0, settings.gymMin||45); });
-  kcal+=add(3.5, rec.walkMin);
-  kcal+=add(8.0, (rec.jogMin||0)+timerJogMin(k));
-  kcal+=add(6.8, rec.cycleMin);
-  if(rec.tkd) kcal+=add(10.0, settings.tkdMin||60);
-  return Math.round(kcal);
+/* MET-based estimate: kcal = MET x kg x hours. Rough, but consistent day to day.
+   Walking counts EITHER the minutes you logged OR your step count — whichever is
+   higher — never both, because your logged walk is already inside your steps.   */
+const STEPS_PER_MIN=100;               // typical walking cadence
+function dayEnergy(k, rec){
+  const w=settings.weightKg||75, kc=(met,min)=>met*w*((min||0)/60);
+  const parts=[];
+  let v=0;
+  v=0; rec.pilates.forEach(o=>{ v+=kc(3.0, optMin(o,30)); }); if(v) parts.push({label:"Pilates", kcal:v});
+  v=0; rec.yoga.forEach(o=>{ v+=kc(o.indexOf("STRETCH")===0?2.5:3.0, optMin(o,30)); }); if(v) parts.push({label:"Yoga", kcal:v});
+  v=0; rec.gym.forEach(()=>{ v+=kc(5.0, settings.gymMin||45); }); if(v) parts.push({label:"Gym", kcal:v});
+
+  const byTime=kc(3.5, rec.walkMin);
+  const bySteps=kc(3.0, (rec.steps||0)/STEPS_PER_MIN);
+  if(byTime>0 || bySteps>0){
+    const useSteps=bySteps>byTime;
+    parts.push({label: useSteps ? `Walking (${rec.steps} steps)` : `Walking (${rec.walkMin} min)`,
+                kcal: Math.max(byTime,bySteps)});
+  }
+  const jm=(rec.jogMin||0)+timerJogMin(k);
+  v=kc(8.0, jm); if(v) parts.push({label:`Jog (${Math.round(jm)} min)`, kcal:v});
+  v=kc(6.8, rec.cycleMin); if(v) parts.push({label:"Cycle", kcal:v});
+  v=rec.tkd?kc(10.0, settings.tkdMin||60):0; if(v) parts.push({label:"TKD", kcal:v});
+
+  return {parts, total:Math.round(parts.reduce((s,p)=>s+p.kcal,0))};
 }
+function dayCalories(k, rec){ return dayEnergy(k, rec).total; }
 
 let savedT=null;
 function flashSaved(){ $("savedMsg").textContent="saved ✓"; clearTimeout(savedT); savedT=setTimeout(()=>{ $("savedMsg").textContent=""; },1200); }
@@ -534,12 +556,20 @@ function renderDay(){
   const tj=timerJogMin(curDayKey);
   $("jogAuto").textContent = tj>0 ? `+ ${Math.round(tj)} min already logged by the run/walk timer` : "No timer sessions this day.";
   $("tkdYes").className=rec.tkd?"on":""; $("tkdNo").className=rec.tkd?"":"on";
-  $("kcalOut").textContent=dayCalories(curDayKey, rec);
+  updateKcal(rec);
+}
+function updateKcal(rec){
+  const e=dayEnergy(curDayKey, rec||getDay(curDayKey));
+  $("kcalOut").textContent=e.total;
+  $("kcalBd").innerHTML = e.parts.length
+    ? e.parts.map(p=>`<div><span>${p.label}</span><span>${Math.round(p.kcal)}</span></div>`).join("")
+      + `<div class="hint">MET method: MET × ${settings.weightKg||75}kg × hours. Walking counts your steps <b>or</b> your walk minutes — whichever is higher, never both.</div>`
+    : "";
 }
 function bindNum(id, field){
   $(id).addEventListener("input",()=>{
     const r=getDay(curDayKey); r[field]=Math.max(0, +$(id).value||0);
-    putDay(curDayKey,r); $("kcalOut").textContent=dayCalories(curDayKey,r); flashSaved();
+    putDay(curDayKey,r); updateKcal(r); flashSaved();
   });
 }
 bindNum("walkMin","walkMin"); bindNum("jogMin","jogMin"); bindNum("cycleMin","cycleMin"); bindNum("stepsIn","steps");
