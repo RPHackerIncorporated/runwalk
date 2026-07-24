@@ -152,6 +152,31 @@
   .metrow{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--line); font-size:14px;}
   .metrow:first-child{border-top:none;}
   .metrow input{flex:0 0 92px; background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:10px; font-size:16px; text-align:center; font-variant-numeric:tabular-nums;}
+
+  /* weekly review */
+  #week-screen{display:none;}
+  .navrow.grid{flex-wrap:wrap;}
+  .navrow.grid button{flex:1 1 calc(50% - 4px);}
+  .wk-stats{display:flex; flex-wrap:wrap; gap:8px;}
+  .wk-stat{flex:1 1 calc(50% - 4px); background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:11px 12px;}
+  .wk-stat .v{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.2;}
+  .wk-stat .k{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.07em;}
+  .wk-stat .d{font-size:12px; font-variant-numeric:tabular-nums; margin-top:2px;}
+  .up{color:var(--run);} .down{color:#f87171;} .flat{color:var(--dim);}
+  .bar{margin-bottom:12px;}
+  .bar:last-child{margin-bottom:0;}
+  .bar .top{display:flex; justify-content:space-between; gap:8px; font-size:14px; margin-bottom:5px;}
+  .bar .top .c{color:var(--dim); font-variant-numeric:tabular-nums;}
+  .bar .track{height:9px; background:var(--panel2); border-radius:999px; overflow:hidden;}
+  .bar .fill{height:100%; border-radius:999px;}
+  .f-ok{background:var(--run);} .f-part{background:var(--amber);} .f-none{background:#b91c1c;}
+  .callout ul{margin:0; padding-left:18px;}
+  .callout li{margin-bottom:5px; font-size:13px; line-height:1.5;}
+  .callout .good{color:var(--run);}
+  .actrow{display:flex; justify-content:space-between; font-size:13px; padding:5px 0; border-top:1px solid var(--line);}
+  .actrow:first-child{border-top:none;}
+  .actrow span:last-child{font-variant-numeric:tabular-nums; color:var(--dim);}
+  .wk-empty{color:var(--dim); text-align:center; padding:26px 10px; font-size:14px; line-height:1.6;}
 </style>
 </head>
 <body>
@@ -197,13 +222,14 @@
 
     <button class="start" id="startBtn">START</button>
     <div class="note">Plays voice cues over Spotify · keeps screen awake while running.<br>Add to Home Screen for a full-screen app.</div>
-    <div class="navrow">
+    <div class="navrow grid">
       <button id="dayBtn">📝 Today</button>
+      <button id="weekBtn">📊 Week</button>
       <button id="histBtn">📋 Runs</button>
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 2.3 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.4 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -282,6 +308,20 @@
     <div class="navrow"><button id="dayBack">🏠 Home</button></div>
   </div>
 
+  <!-- ================= WEEKLY REVIEW ================= -->
+  <div id="week-screen">
+    <div class="day-head">
+      <button class="day-nav" id="wkPrev">‹</button>
+      <div class="day-title" id="wkTitle">This week</div>
+      <button class="day-nav" id="wkNext">›</button>
+    </div>
+    <div class="sec"><h3>Summary</h3><div class="wk-stats" id="wkStats"></div></div>
+    <div class="sec"><h3>Body areas</h3><div id="wkAreas"></div></div>
+    <div class="sec"><h3>What to watch</h3><div class="callout" id="wkCallouts"></div></div>
+    <div class="sec"><h3>Time by activity</h3><div id="wkByAct"></div></div>
+    <div class="navrow"><button id="wkHome">🏠 Home</button></div>
+  </div>
+
   <!-- ================= SETTINGS ================= -->
   <div id="set-screen">
     <div class="day-head">
@@ -303,6 +343,11 @@
       <div id="metList"></div>
       <div class="auto">A MET is how many times harder than resting an activity is.<br>calories = MET × your weight × hours.</div>
       <div class="backup"><button id="metReset">↺ Reset METs to defaults</button></div>
+    </div>
+
+    <div class="sec"><h3>Weekly targets</h3>
+      <div id="targetList"></div>
+      <div class="auto">Sessions per week. The weekly review flags anything below its target.</div>
     </div>
 
     <div class="sec"><h3>Voice cues</h3>
@@ -477,7 +522,7 @@ loadCues(); renderCues();
 
 /* ---------- run history log ---------- */
 function loadLog(){ try{ return JSON.parse(localStorage.getItem("runwalk_log")||"[]"); }catch(e){ return []; } }
-function writeLog(log){ try{ localStorage.setItem("runwalk_log", JSON.stringify(log)); }catch(e){} }
+function writeLog(log){ _timerCache=null; try{ localStorage.setItem("runwalk_log", JSON.stringify(log)); }catch(e){} }
 function logSession(){
   const rt=Math.max(0, elapsedSec()-LEAD);
   if(rt<10) return;                       // ignore accidental / very short runs
@@ -534,17 +579,27 @@ const ACT={
 const DEF_MET={pilates:3.0, yogaWake:3.0, yogaStretch:2.5, gym:4.0, walk:2.0, jog:8.0, cycle:6.8, tkd:10.0, bonus:4.0};
 const MET_FIELDS=[["pilates","Pilates"],["yogaWake","Yoga — wake up"],["yogaStretch","Yoga — stretch"],
                   ["gym","Gym"],["walk","Walk / steps"],["jog","Jog"],["cycle","Cycle"],["tkd","TKD"],["bonus","Bonus"]];
-const DEF_SET={weightKg:75, gymMin:45, tkdMin:60, met:DEF_MET};
+const DEF_TARGETS={upper:2, lower:2, core:2, flex:3, cardio:3, tkd:5};
+const TARGET_FIELDS=[["upper","Upper body"],["lower","Lower body"],["core","Core"],
+                     ["flex","Flexibility"],["cardio","Cardio"],["tkd","TKD sessions"]];
+const DEF_SET={weightKg:75, gymMin:45, tkdMin:60, met:DEF_MET, targets:DEF_TARGETS};
 let settings=(function(){
   let s={}; try{ s=JSON.parse(localStorage.getItem("runwalk_settings")||"{}"); }catch(e){}
   const merged=Object.assign({}, DEF_SET, s);
   merged.met=Object.assign({}, DEF_MET, s.met||{});   // fill in any MET added in a later version
+  merged.targets=Object.assign({}, DEF_TARGETS, s.targets||{});
   return merged;
 })();
 function saveSettings(){ try{ localStorage.setItem("runwalk_settings", JSON.stringify(settings)); }catch(e){} }
 
-function loadDays(){ try{ return JSON.parse(localStorage.getItem("runwalk_days")||"{}"); }catch(e){ return {}; } }
-function writeDays(d){ try{ localStorage.setItem("runwalk_days", JSON.stringify(d)); }catch(e){} }
+/* cached so week/trend analysis doesn't re-parse storage for every day it reads */
+let _daysCache=null;
+function loadDays(){
+  if(_daysCache) return _daysCache;
+  try{ _daysCache=JSON.parse(localStorage.getItem("runwalk_days")||"{}"); }catch(e){ _daysCache={}; }
+  return _daysCache;
+}
+function writeDays(d){ _daysCache=d; try{ localStorage.setItem("runwalk_days", JSON.stringify(d)); }catch(e){} }
 function dayKey(dt){ const d=dt||new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function blankDay(){ return {pilates:[],yoga:[],gym:[],walkMin:0,jogMin:0,jogEdited:false,cycleMin:0,tkd:false,steps:0,bonus:"",bonusMin:0,notes:""}; }
@@ -568,7 +623,13 @@ function dayIsEmpty(r){ return !r.pilates.length&&!r.yoga.length&&!r.gym.length&
 
 let curDayKey=dayKey();
 function optMin(o, fb){ const m=/_(\d+)$/.exec(o); return m?+m[1]:fb; }
-function timerJogMin(k){ return loadLog().filter(e=>dayKey(new Date(e.ts))===k).reduce((s,e)=>s+(e.dur||0)/60, 0); }
+let _timerCache=null;
+function timerMinByDay(){
+  if(_timerCache) return _timerCache;
+  const m={}; loadLog().forEach(e=>{ const k=dayKey(new Date(e.ts)); m[k]=(m[k]||0)+(e.dur||0)/60; });
+  _timerCache=m; return m;
+}
+function timerJogMin(k){ return timerMinByDay()[k]||0; }
 /* MET-based estimate: kcal = MET x kg x hours. Rough, but consistent day to day.
    Walking counts EITHER the minutes you logged OR your step count — whichever is
    higher — never both, because your logged walk is already inside your steps.   */
@@ -599,6 +660,86 @@ function dayEnergy(k, rec){
   return {parts, total:Math.round(parts.reduce((s,p)=>s+p.kcal,0))};
 }
 function dayCalories(k, rec){ return dayEnergy(k, rec).total; }
+
+/* ---------- weekly analysis ---------- */
+const AREAS=[["upper","Upper body"],["lower","Lower body"],["core","Core"],["flex","Flexibility"],["cardio","Cardio"]];
+const ACT_LABELS={pilates:"Pilates", yoga:"Yoga", gym:"Gym", walk:"Walking", jog:"Jog", cycle:"Cycle", tkd:"TKD", bonus:"Bonus"};
+function walkMinEff(rec){ return Math.max(rec.walkMin||0, (rec.steps||0)/STEPS_PER_MIN); }
+/* minutes of each activity on a day (walking uses the same steps-or-time rule as calories) */
+function dayActivity(k, rec){
+  const a={};
+  a.pilates=(rec.pilates||[]).reduce((s,o)=>s+optMin(o,30),0);
+  a.yoga   =(rec.yoga||[]).reduce((s,o)=>s+optMin(o,30),0);
+  a.gym    =(rec.gym||[]).length*(settings.gymMin||45);
+  a.walk   =walkMinEff(rec);
+  a.jog    =jogMinutesFor(k,rec);
+  a.cycle  =rec.cycleMin||0;
+  a.tkd    =rec.tkd?(settings.tkdMin||60):0;
+  a.bonus  =rec.bonusMin||0;
+  a.total  =Object.keys(ACT_LABELS).reduce((s,key)=>s+a[key],0);
+  return a;
+}
+/* how many sessions each body area got on a day (see the mapping table) */
+function dayAreaCounts(k, rec){
+  const gym=rec.gym||[], yoga=rec.yoga||[], pil=(rec.pilates||[]).length;
+  const yogaWake=yoga.filter(o=>o.indexOf("WAKE")===0).length;
+  const jog=jogMinutesFor(k,rec)>0?1:0, cyc=(rec.cycleMin||0)>0?1:0, tkd=rec.tkd?1:0;
+  /* only a deliberate logged walk counts as a session — incidental steps don't,
+     otherwise a normal 8k-step day would max out Lower body every day. */
+  const bigWalk=(rec.walkMin||0)>=30?1:0;
+  return {
+    upper: gym.filter(o=>o==="TOPS").length,
+    lower: gym.filter(o=>o==="BOTTOMS").length + jog + cyc + tkd + bigWalk,
+    core : gym.filter(o=>o==="TKD_CORE").length + pil + yogaWake + tkd,
+    flex : pil + yoga.length,
+    cardio: jog + cyc + tkd                       // walking deliberately excluded
+  };
+}
+function mondayOf(d){ const x=new Date(d); x.setHours(12,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; }
+function weekInfo(monday){
+  const days=[], sum={minutes:0, kcal:0, steps:0, activeDays:0, tkd:0,
+                      areas:{upper:0,lower:0,core:0,flex:0,cardio:0}, byAct:{}};
+  for(let i=0;i<7;i++){
+    const d=new Date(monday); d.setDate(d.getDate()+i);
+    const k=dayKey(d), rec=getDay(k);
+    const act=dayActivity(k,rec), areas=dayAreaCounts(k,rec);
+    days.push({k, date:d, rec, act, areas});
+    sum.minutes+=act.total; sum.kcal+=dayCalories(k,rec); sum.steps+=rec.steps||0;
+    if(act.total>0) sum.activeDays++;
+    if(rec.tkd) sum.tkd++;
+    AREAS.forEach(([key])=>sum.areas[key]+=areas[key]);
+    Object.keys(ACT_LABELS).forEach(key=>sum.byAct[key]=(sum.byAct[key]||0)+act[key]);
+  }
+  return {monday, days, sum};
+}
+/* days since each thing was last done (null = never / not in range) */
+function daysSince(){
+  const days=loadDays(), tm=timerMinByDay(), today=new Date(), out={};
+  const checks={
+    "Gym TOPS":r=>(r.gym||[]).includes("TOPS"),
+    "Gym BOTTOMS":r=>(r.gym||[]).includes("BOTTOMS"),
+    "Gym TKD_CORE":r=>(r.gym||[]).includes("TKD_CORE"),
+    "Pilates":r=>(r.pilates||[]).length>0,
+    "Yoga":r=>(r.yoga||[]).length>0,
+    "Cycle":r=>(r.cycleMin||0)>0,
+    "TKD":r=>!!r.tkd
+  };
+  Object.keys(checks).forEach(n=>{
+    out[n]=null;
+    for(let i=0;i<180;i++){
+      const d=new Date(today); d.setDate(d.getDate()-i);
+      const r=days[dayKey(d)];
+      if(r && checks[n](r)){ out[n]=i; break; }
+    }
+  });
+  out["Jog"]=null;
+  for(let i=0;i<180;i++){
+    const d=new Date(today); d.setDate(d.getDate()-i); const k=dayKey(d);
+    const r=days[k]||{};
+    if((tm[k]||0)>0 || (r.jogMin||0)>0){ out["Jog"]=i; break; }
+  }
+  return out;
+}
 
 let savedT=null;
 function flashSaved(){ $("savedMsg").textContent="saved ✓"; clearTimeout(savedT); savedT=setTimeout(()=>{ $("savedMsg").textContent=""; },1200); }
@@ -658,6 +799,73 @@ $("dayNext").addEventListener("click",()=>{ const d=new Date(curDayKey+"T12:00:0
 $("dayBtn").addEventListener("click",()=>{ curDayKey=dayKey(); renderDay(); $("setup-screen").style.display="none"; $("day-screen").style.display="block"; });
 $("dayBack").addEventListener("click",()=>{ $("day-screen").style.display="none"; $("setup-screen").style.display="block"; refreshTodo(); });
 
+/* ---------- weekly review screen ---------- */
+let curMonday=mondayOf(new Date());
+function hrs(min){ const m=Math.round(min); return m>=60 ? Math.floor(m/60)+"h "+(m%60)+"m" : m+"m"; }
+function delta(now, prev, unit){
+  if(!prev && !now) return `<div class="d flat">—</div>`;
+  const d=now-prev;
+  if(d===0) return `<div class="d flat">same as last week</div>`;
+  const cls=d>0?"up":"down", sign=d>0?"+":"−";
+  const val=unit==="min" ? hrs(Math.abs(d)) : Math.abs(Math.round(d)).toLocaleString();
+  return `<div class="d ${cls}">${sign}${val} vs last week</div>`;
+}
+function renderWeek(){
+  const wk=weekInfo(curMonday);
+  const prevMon=new Date(curMonday); prevMon.setDate(prevMon.getDate()-7);
+  const pv=weekInfo(prevMon).sum, s=wk.sum, T=settings.targets;
+
+  const thisMon=mondayOf(new Date());
+  const end=new Date(curMonday); end.setDate(end.getDate()+6);
+  const fmtD=d=>d.toLocaleDateString(undefined,{day:"numeric",month:"short"});
+  $("wkTitle").textContent=(curMonday.getTime()===thisMon.getTime()?"This week · ":"")+fmtD(curMonday)+" – "+fmtD(end);
+  $("wkNext").style.visibility = curMonday>=thisMon ? "hidden":"visible";
+
+  $("wkStats").innerHTML=
+    `<div class="wk-stat"><div class="k">Active days</div><div class="v">${s.activeDays}/7</div>${delta(s.activeDays,pv.activeDays)}</div>`+
+    `<div class="wk-stat"><div class="k">Active time</div><div class="v">${hrs(s.minutes)}</div>${delta(s.minutes,pv.minutes,"min")}</div>`+
+    `<div class="wk-stat"><div class="k">Calories</div><div class="v">${s.kcal.toLocaleString()}</div>${delta(s.kcal,pv.kcal)}</div>`+
+    `<div class="wk-stat"><div class="k">Steps</div><div class="v">${s.steps.toLocaleString()}</div>${delta(s.steps,pv.steps)}</div>`;
+
+  const bar=(label,count,target)=>{
+    const pct=target>0?Math.min(100, Math.round(count/target*100)):(count>0?100:0);
+    const cls=count>=target&&target>0?"f-ok":(count>0?"f-part":"f-none");
+    return `<div class="bar"><div class="top"><span>${label}</span><span class="c">${count} / ${target}</span></div>`+
+           `<div class="track"><div class="fill ${cls}" style="width:${pct}%"></div></div></div>`;
+  };
+  $("wkAreas").innerHTML = AREAS.map(([k,l])=>bar(l, s.areas[k], T[k]||0)).join("")
+                          + bar("TKD sessions", s.tkd, T.tkd||0);
+
+  /* callouts */
+  const ds=daysSince(), miss=[];
+  AREAS.forEach(([k,l])=>{
+    const c=s.areas[k], t=T[k]||0;
+    if(t>0 && c===0) miss.push(`<li><b>${l}</b> — nothing at all this week (target ${t}).</li>`);
+    else if(t>0 && c<t) miss.push(`<li><b>${l}</b> — ${c} of ${t}, ${t-c} short.</li>`);
+  });
+  if((T.tkd||0)>0 && s.tkd<T.tkd) miss.push(`<li><b>TKD</b> — ${s.tkd} of ${T.tkd} sessions.</li>`);
+  Object.keys(ds).forEach(n=>{
+    if(ds[n]===null) return;
+    if(ds[n]>=10) miss.push(`<li><b>${n}</b> — not done for ${ds[n]} days.</li>`);
+  });
+  if(s.minutes===0) $("wkCallouts").innerHTML=`<div class="wk-empty">Nothing logged this week yet.</div>`;
+  else if(!miss.length) $("wkCallouts").innerHTML=`<ul><li class="good">Every target met this week. Nicely balanced.</li></ul>`;
+  else $("wkCallouts").innerHTML="<ul>"+miss.join("")+"</ul>";
+
+  const rows=Object.keys(ACT_LABELS).filter(k=>s.byAct[k]>0)
+    .sort((a,b)=>s.byAct[b]-s.byAct[a])
+    .map(k=>`<div class="actrow"><span>${ACT_LABELS[k]}</span><span>${hrs(s.byAct[k])}</span></div>`).join("");
+  $("wkByAct").innerHTML = rows || `<div class="wk-empty">No activity logged.</div>`;
+}
+function showWeek(){ curMonday=mondayOf(new Date()); renderWeek();
+  $("setup-screen").style.display="none"; $("week-screen").style.display="block"; }
+function hideWeek(){ $("week-screen").style.display="none"; $("setup-screen").style.display="block"; refreshTodo(); }
+$("weekBtn").addEventListener("click", showWeek);
+$("wkHome").addEventListener("click", hideWeek);
+$("wkPrev").addEventListener("click",()=>{ curMonday.setDate(curMonday.getDate()-7); renderWeek(); });
+$("wkNext").addEventListener("click",()=>{ const n=new Date(curMonday); n.setDate(n.getDate()+7);
+  if(n<=mondayOf(new Date())){ curMonday=n; renderWeek(); } });
+
 /* settings + backup */
 let setSavedT=null;
 function flashSet(){ $("setSaved").textContent="saved ✓"; clearTimeout(setSavedT); setSavedT=setTimeout(()=>{ $("setSaved").textContent=""; },1200); }
@@ -677,9 +885,25 @@ function renderMets(){
     row.appendChild(span); row.appendChild(inp); box.appendChild(row);
   });
 }
+function renderTargets(){
+  const box=$("targetList"); box.innerHTML="";
+  TARGET_FIELDS.forEach(([k,label])=>{
+    const row=document.createElement("div"); row.className="metrow";
+    const span=document.createElement("span"); span.textContent=label+" ";
+    const def=document.createElement("span");
+    def.textContent="["+DEF_TARGETS[k]+"]";
+    def.style.color="var(--dim)"; def.style.fontSize="12px";
+    span.appendChild(def);
+    const inp=document.createElement("input");
+    inp.type="number"; inp.step="1"; inp.min="0"; inp.max="21"; inp.inputMode="numeric";
+    inp.value=settings.targets[k];
+    inp.addEventListener("input",()=>{ settings.targets[k]=Math.max(0, Math.round(+inp.value||0)); saveSettings(); flashSet(); });
+    row.appendChild(span); row.appendChild(inp); box.appendChild(row);
+  });
+}
 function renderSettings(){
   $("setWeight").value=settings.weightKg; $("setGym").value=settings.gymMin; $("setTkd").value=settings.tkdMin;
-  renderMets();
+  renderMets(); renderTargets();
 }
 $("setWeight").addEventListener("input",()=>{ settings.weightKg=+$("setWeight").value||75; saveSettings(); flashSet(); });
 $("setGym").addEventListener("input",()=>{ settings.gymMin=+$("setGym").value||45; saveSettings(); flashSet(); });
@@ -732,6 +956,11 @@ function refreshTodo(){
   const k=dayKey(), empty=dayIsEmpty(getDay(k)), hr=new Date().getHours();
   const yk=(function(){ const d=new Date(); d.setDate(d.getDate()-1); return dayKey(d); })();
   const yEmpty=dayIsEmpty(getDay(yk));
+  if(new Date().getDay()===0 && hr>=17){   // Sunday evening: the week is done
+    b.style.display="block";
+    b.innerHTML="📊 <b>Your week is ready.</b> Tap “Week” for the review"+(empty?" — and today isn't logged yet.":".");
+    return;
+  }
   if(hr>=17 && empty){ b.style.display="block"; b.innerHTML="📝 <b>Today's log is empty.</b> Tap “Today's log” to record what you did."; }
   else if(yEmpty && hr<17){ b.style.display="block"; b.innerHTML="📝 <b>Yesterday wasn't logged.</b> Tap “Today's log”, then ‹ to go back a day."; }
   else b.style.display="none";
