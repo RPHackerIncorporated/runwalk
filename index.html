@@ -222,7 +222,7 @@
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 2.1 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.2 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -350,8 +350,9 @@ if("serviceWorker" in navigator){
 const DEF = {
   run:30, walk:120,
   landmarks:[
-    {label:"Top of 5-min path", t:13*60},
-    {label:"Top of Mt Vic", t:27*60},
+    {label:"Mt Victoria Loop", t:47*60},   // 47:00
+    {label:"Park Run",         t:57*60},   // 57:00
+    {label:"Gym 5km",          t:2826},    // 47.1 min = 47:06
   ]
 };
 function load(){ try{ return Object.assign({}, DEF, JSON.parse(localStorage.getItem("runwalk")||"{}")); }catch(e){ return {...DEF}; } }
@@ -395,6 +396,20 @@ function renderLmEditor(){
   });
 }
 $("addLm").addEventListener("click",()=>{ cfg.landmarks.push({label:"",t:null}); renderLmEditor(); save(); });
+
+/* one-time: swap the original sample landmarks for the current defaults,
+   but only if they were never edited — custom landmarks are left alone. */
+(function(){
+  try{
+    if(localStorage.getItem("runwalk_lm_v2")) return;
+    const old=[["Top of 5-min path",780],["Top of Mt Vic",1620]];
+    const cur=cfg.landmarks||[];
+    const untouched = cur.length===old.length &&
+      cur.every((lm,i)=>lm.label===old[i][0] && lm.t===old[i][1]);
+    if(untouched){ cfg.landmarks=DEF.landmarks.map(l=>({label:l.label, t:l.t})); save(); }
+    localStorage.setItem("runwalk_lm_v2","1");
+  }catch(e){}
+})();
 
 renderSteppers(); renderLmEditor();
 
