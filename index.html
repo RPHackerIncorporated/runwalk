@@ -222,7 +222,7 @@
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 1.9 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.0 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -254,6 +254,7 @@
       <button class="hist-clear" id="histClear">Clear</button>
     </div>
     <div id="histList"></div>
+    <div class="navrow"><button id="histHome">🏠 Home</button></div>
   </div>
 
   <!-- ================= DAILY LOG ================= -->
@@ -297,7 +298,7 @@
       <div class="kcalbd" id="kcalBd"></div>
     </div>
     <div class="saved" id="savedMsg"></div>
-    <div class="navrow"><button id="dayBack">← Back</button></div>
+    <div class="navrow"><button id="dayBack">🏠 Home</button></div>
   </div>
 
   <!-- ================= SETTINGS ================= -->
@@ -333,7 +334,7 @@
     </div>
 
     <div class="saved" id="setSaved"></div>
-    <div class="navrow"><button id="setBack2">← Back</button></div>
+    <div class="navrow"><button id="setBack2">🏠 Home</button></div>
   </div>
 </div>
 
@@ -505,7 +506,9 @@ function renderHist(){
   }));
 }
 $("histBtn").addEventListener("click",()=>{ renderHist(); $("setup-screen").style.display="none"; $("hist-screen").style.display="block"; });
-$("histBack").addEventListener("click",()=>{ $("hist-screen").style.display="none"; $("setup-screen").style.display="block"; });
+function hideHist(){ $("hist-screen").style.display="none"; $("setup-screen").style.display="block"; }
+$("histBack").addEventListener("click", hideHist);
+$("histHome").addEventListener("click", hideHist);
 $("histClear").addEventListener("click",()=>{ if(confirm("Clear all run history?")){ localStorage.removeItem("runwalk_log"); renderHist(); } });
 
 /* ---------- daily activity log ---------- */
