@@ -195,25 +195,6 @@
       <button class="addbtn" id="addLm">+ Add landmark</button>
     </div>
 
-    <div class="card">
-      <label>Voice cues</label>
-      <div class="cue-row" data-cue="run">
-        <div class="cue-id run">RUN</div>
-        <div class="cue-status"></div>
-        <button class="cue-btn play" title="Preview">▶</button>
-        <button class="cue-btn rec">● Rec</button>
-        <button class="cue-btn reset" title="Reset to default">↺</button>
-      </div>
-      <div class="cue-row" data-cue="walk">
-        <div class="cue-id walk">WALK</div>
-        <div class="cue-status"></div>
-        <button class="cue-btn play" title="Preview">▶</button>
-        <button class="cue-btn rec">● Rec</button>
-        <button class="cue-btn reset" title="Reset to default">↺</button>
-      </div>
-      <div class="cue-hint">Default is a tone. Tap <b>● Rec</b>, say "Run!" / "Walk!", tap <b>■ Stop</b> — that recording then plays at each switch, even with the screen locked.</div>
-    </div>
-
     <button class="start" id="startBtn">START</button>
     <div class="note">Plays voice cues over Spotify · keeps screen awake while running.<br>Add to Home Screen for a full-screen app.</div>
     <div class="navrow">
@@ -222,7 +203,7 @@
       <button id="setBtn">⚙ Settings</button>
     </div>
 
-    <div class="note" style="margin-top:2px; opacity:.7;">version 2.2 · 29 Jun</div>
+    <div class="note" style="margin-top:2px; opacity:.7;">version 2.3 · 29 Jun</div>
   </div>
 
   <!-- ================= RUN ================= -->
@@ -322,6 +303,24 @@
       <div id="metList"></div>
       <div class="auto">A MET is how many times harder than resting an activity is.<br>calories = MET × your weight × hours.</div>
       <div class="backup"><button id="metReset">↺ Reset METs to defaults</button></div>
+    </div>
+
+    <div class="sec"><h3>Voice cues</h3>
+      <div class="cue-row" data-cue="run">
+        <div class="cue-id run">RUN</div>
+        <div class="cue-status"></div>
+        <button class="cue-btn play" title="Preview">▶</button>
+        <button class="cue-btn rec">● Rec</button>
+        <button class="cue-btn reset" title="Reset to default">↺</button>
+      </div>
+      <div class="cue-row" data-cue="walk">
+        <div class="cue-id walk">WALK</div>
+        <div class="cue-status"></div>
+        <button class="cue-btn play" title="Preview">▶</button>
+        <button class="cue-btn rec">● Rec</button>
+        <button class="cue-btn reset" title="Reset to default">↺</button>
+      </div>
+      <div class="cue-hint">Default is a tone. Tap <b>● Rec</b>, say "Run!" / "Walk!", tap <b>■ Stop</b> — that recording then plays at each switch, even with the screen locked.</div>
     </div>
 
     <div class="sec"><h3>Backup</h3>
